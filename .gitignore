@@ -11,6 +11,8 @@ target/
 dbt_packages/
 logs/
 .user.yml
+*.duckdb
+*.duckdb.wal
 
 # Env / secrets
 .env

@@ -17,3 +17,20 @@ dbt --version
 ```
 
 Verifica che l'output mostri sia `Core` che il plugin `duckdb` installati.
+
+## Progetto dbt (Fase 2)
+
+Il progetto dbt vive in [`raggiamo/`](./raggiamo). `profiles.yml` è committato
+nel repo (caso particolare: con DuckDB non ci sono credenziali, solo un path
+di file locale) e usa `env_var()` per restare configurabile dall'esterno.
+
+```bash
+cd raggiamo
+export DBT_PROFILES_DIR=.        # dice a dbt dove cercare profiles.yml
+dbt debug                        # verifica la connessione al database
+```
+
+Per usare un file DuckDB diverso da quello di default (`dev.duckdb`):
+```bash
+export DBT_DATABASE_PATH=/percorso/tuo.duckdb
+```

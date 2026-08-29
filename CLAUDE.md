@@ -51,11 +51,16 @@ database (tool-calling), spiegando dipendenze, lineage, problemi nei dati.
 5. **Agente** — LangGraph con due tool (RAG + query SQL), tool-calling
 
 ## Stato attuale
-**Fase 1 (parziale)**: creata la struttura base del repo, virtual environment
-con `dbt-core` 1.12.3 + `dbt-duckdb` 1.11.0 installati e verificati
-(`requirements.txt` con versioni pinnate). Manca ancora: setup Ollama in
-locale. Prossimo passo previsto: `dbt init` per generare il progetto dbt e
-capire `profiles.yml` (Fase 2).
+**Fase 1 completata** (tranne Ollama, rimandato a quando si lavora in
+locale con GPU): venv con `dbt-core` 1.12.3 + `dbt-duckdb` 1.11.0.
+
+**Fase 2 (parziale)**: progetto dbt generato in `raggiamo/` (`dbt init`).
+Creato `raggiamo/profiles.yml` (committato: nessuna credenziale, solo path
+DuckDB via `env_var()`), verificato con `dbt debug` (connessione OK).
+Prossimo passo: sostituire i modelli di esempio generati da `dbt init`
+(`models/example/`) con il primo modello reale, dopo aver ingestionato un
+dataset (Fase 3) — per ora capire ref/source e materializzazioni sui modelli
+di esempio.
 
 ## Stile di lavoro richiesto
 - Risposte sintetiche e precise, linguaggio comprensibile anche a chi non è

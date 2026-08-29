@@ -1,0 +1,16 @@
+# profiles.yml normalmente NON si versiona (contiene credenziali del database
+# e vive per convenzione in ~/.dbt/profiles.yml, fuori dal repo).
+#
+# Qui lo committiamo apposta: con l'adapter DuckDB non ci sono credenziali,
+# solo il path di un file locale, e usando env_var() quel path resta
+# configurabile dall'esterno (variabile d'ambiente / .env) senza toccare
+# questo file né tantomeno il codice SQL dei modelli. Passando a un altro
+# database (Postgres, Snowflake, ...) si sostituisce questo blocco con quello
+# dell'adapter corrispondente: i modelli in models/ non cambiano.
+raggiamo:
+  target: dev
+  outputs:
+    dev:
+      type: duckdb
+      path: "{{ env_var('DBT_DATABASE_PATH', 'dev.duckdb') }}"
+      threads: 4
