@@ -75,3 +75,25 @@ DBT_PROFILES_DIR=. dbt build   # materializza i modelli + esegue i test
 
 Materializzati come `table` (a differenza di staging/intermediate, che sono
 `view`): sono il livello finale, non ha senso ricalcolare i join a ogni query.
+
+## RAG sulla documentazione dbt (Fase 4)
+
+Richiede [Ollama](https://ollama.com) installato e in esecuzione in locale
+(non incluso in questo repo — serve una macchina vera, tipicamente con GPU).
+
+```bash
+ollama pull nomic-embed-text     # modello di embedding (~270MB)
+
+cd raggiamo
+DBT_PROFILES_DIR=. dbt docs generate   # produce target/manifest.json
+cd ..
+
+pip install -r requirements.txt        # se non già fatto
+python -m rag.build_index              # indicizza i modelli in Chroma
+python -m rag.query "come si calcola il fatturato di una riga di fattura?"
+```
+
+`rag/build_index.py` legge `target/manifest.json` (descrizioni, colonne,
+lineage — già calcolati da dbt, non li riparsiamo dagli YAML), genera un
+embedding per modello con Ollama e li salva in `chroma_db/` (locale,
+gitignored, rigenerabile in qualunque momento rilanciando lo script).

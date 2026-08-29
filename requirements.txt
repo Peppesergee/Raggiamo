@@ -10,3 +10,8 @@ dbt-duckdb==1.11.0
 pandas==3.0.5
 SQLAlchemy==2.0.52
 duckdb-engine==0.17.0
+
+# Fase 4: RAG (rag/build_index.py, rag/query.py)
+# Richiede Ollama in esecuzione in locale (non incluso: https://ollama.com)
+chromadb==1.5.9
+ollama==0.6.2

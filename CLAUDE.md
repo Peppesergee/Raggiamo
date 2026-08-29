@@ -78,10 +78,26 @@ tool). Tutti materializzati come `table`. `dbt build`: 55/55 PASS (dataset
 pulito, nessuna anomalia nelle FK — da tenere a mente per quando l'agente
 dovrà "spiegare problemi nei dati": qui non ne troverà).
 
-Prossimo passo: **Fase 4 (RAG)** — indicizzare in Chroma la documentazione
-di questi modelli (`schema.yml` + `manifest.json` di dbt) per farla cercare
-semanticamente dall'agente. Qui Giuseppe vuole spiegazioni accurate passo
-passo (nuovo territorio rispetto a dbt).
+**Fase 4 (RAG) in corso**: `rag/manifest_docs.py` legge `target/manifest.json`
+(prodotto da `dbt docs generate`) e costruisce un documento testuale per
+modello (descrizione, colonne, lineage) — verificato: 15 modelli letti
+correttamente. `rag/build_index.py` genera gli embedding via Ollama
+(`nomic-embed-text`) e li salva in una collezione Chroma persistita in
+`chroma_db/`. `rag/query.py` interroga l'indice con una domanda in
+linguaggio naturale (stessa logica che diventerà il tool RAG dell'agente
+in Fase 5).
+
+**Nota**: non testato end-to-end in questa sessione (niente Ollama/GPU nel
+container cloud) — da verificare in locale sulla RTX 4060 di Giuseppe.
+Gap noto: le colonne nei vari `schema.yml` non hanno ancora `description`
+(solo test), quindi per ora l'unico testo utile alla ricerca semantica è
+la descrizione a livello di modello — arricchire le colonne è un buon
+prossimo passo per migliorare la qualità del retrieval.
+
+Prossimo passo: Giuseppe esegue in locale i comandi RAG (vedi README) e
+conferma che la ricerca semantica restituisca i modelli giusti; poi si
+passa a comporre il prompt per l'LLM con i risultati recuperati, e infine
+Fase 5 (agente LangGraph).
 
 ## Stile di lavoro richiesto
 - Risposte sintetiche e precise, linguaggio comprensibile anche a chi non è
