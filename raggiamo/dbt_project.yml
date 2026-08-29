@@ -26,9 +26,15 @@ clean-targets:         # directories to be removed by `dbt clean`
 # Configuring models
 # Full documentation: https://docs.getdbt.com/docs/configuring-models
 
-# Staging = uno-a-uno con la sorgente, solo rinomina/cast: si materializza
-# come view (leggera, sempre aggiornata). I marts (Fase 4) saranno tabelle.
+# Staging = uno-a-uno con la sorgente, solo rinomina/cast: view (leggera,
+# sempre aggiornata). Intermediate = join riusati da più marts: anche view,
+# non serve materializzarli fisicamente. Marts = tabelle: sono il livello
+# che l'agente interrogherà, meglio non ricalcolare i join ogni volta.
 models:
   raggiamo:
     staging:
       +materialized: view
+    intermediate:
+      +materialized: view
+    marts:
+      +materialized: table

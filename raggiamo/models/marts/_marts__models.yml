@@ -1,0 +1,35 @@
+version: 2
+
+models:
+  - name: dim_customers
+    description: Un cliente, con il proprio support rep (dipendente) associato.
+    columns:
+      - name: customer_id
+        data_tests: [unique, not_null]
+
+  - name: dim_tracks
+    description: Una traccia denormalizzata (con album, artista, genere, media type).
+    columns:
+      - name: track_id
+        data_tests: [unique, not_null]
+
+  - name: fct_invoice_lines
+    description: >
+      Tabella dei fatti a grana "riga di fattura": una traccia venduta in
+      una fattura, con importo (`line_amount`) e le dimensioni denormalizzate
+      utili per analisi (cliente, traccia/artista/genere, paese).
+    columns:
+      - name: invoice_line_id
+        data_tests: [unique, not_null]
+      - name: customer_id
+        data_tests:
+          - relationships:
+              arguments:
+                to: ref('dim_customers')
+                field: customer_id
+      - name: track_id
+        data_tests:
+          - relationships:
+              arguments:
+                to: ref('dim_tracks')
+                field: track_id

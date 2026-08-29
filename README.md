@@ -61,3 +61,17 @@ foreign key).
 cd raggiamo
 DBT_PROFILES_DIR=. dbt build   # materializza i modelli + esegue i test
 ```
+
+## Modelli intermedi e marts
+
+- `models/intermediate/int_tracks_enriched.sql`: traccia con album/artista/
+  genere/media type già joinati — riusato da più marts (view, non serve
+  materializzarlo fisicamente).
+- `models/marts/`: livello che l'agente interrogherà.
+  - `dim_customers`, `dim_tracks`: dimensioni denormalizzate.
+  - `fct_invoice_lines`: fatti a grana riga di fattura, con `line_amount`
+    (`unit_price * quantity`) e le dimensioni già joinate per query dirette
+    (es. fatturato per artista/genere/paese senza altri join).
+
+Materializzati come `table` (a differenza di staging/intermediate, che sono
+`view`): sono il livello finale, non ha senso ricalcolare i join a ogni query.

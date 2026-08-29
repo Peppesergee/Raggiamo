@@ -67,12 +67,21 @@ SQLAlchemy + `duckdb-engine`), idempotente (`if_exists="replace"`).
 **Fase 2/4 (staging)**: `raggiamo/models/staging/chinook/` — un modello
 1:1 per ciascuna delle 11 tabelle `raw.*` (rinomina snake_case + cast,
 niente logica di business), con `source.yml` e test (`unique`, `not_null`,
-`relationships` sulle FK). `dbt build`: 11 view + 30 test, tutti verdi
-(dataset pulito, nessuna anomalia nelle FK).
-Prossimo passo: modelli intermedi/marts (es. fatturato per cliente/artista,
-o una tabella "denormalizzata" comoda da far interrogare all'agente) —
-Fase 4 vera e propria inizia dopo, con RAG sulla documentazione di questi
-modelli.
+`relationships` sulle FK).
+
+**Marts**: `models/intermediate/int_tracks_enriched.sql` (traccia +
+album/artista/genere/media type joinati, view, riusato da più marts) e
+`models/marts/`: `dim_customers`, `dim_tracks` (dimensioni denormalizzate),
+`fct_invoice_lines` (grana riga di fattura, con `line_amount` e dimensioni
+già joinate — pensato per essere il livello che l'agente interroga via SQL
+tool). Tutti materializzati come `table`. `dbt build`: 55/55 PASS (dataset
+pulito, nessuna anomalia nelle FK — da tenere a mente per quando l'agente
+dovrà "spiegare problemi nei dati": qui non ne troverà).
+
+Prossimo passo: **Fase 4 (RAG)** — indicizzare in Chroma la documentazione
+di questi modelli (`schema.yml` + `manifest.json` di dbt) per farla cercare
+semanticamente dall'agente. Qui Giuseppe vuole spiegazioni accurate passo
+passo (nuovo territorio rispetto a dbt).
 
 ## Stile di lavoro richiesto
 - Risposte sintetiche e precise, linguaggio comprensibile anche a chi non è

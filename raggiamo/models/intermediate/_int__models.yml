@@ -1,0 +1,11 @@
+version: 2
+
+models:
+  - name: int_tracks_enriched
+    description: >
+      Una traccia con album, artista, genere e media type già joinati.
+      Livello intermedio riusato da più modelli marts (dim_tracks,
+      fct_invoice_lines) per evitare di ripetere gli stessi join.
+    columns:
+      - name: track_id
+        data_tests: [unique, not_null]
