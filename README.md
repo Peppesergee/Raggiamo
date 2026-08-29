@@ -34,3 +34,17 @@ Per usare un file DuckDB diverso da quello di default (`dev.duckdb`):
 ```bash
 export DBT_DATABASE_PATH=/percorso/tuo.duckdb
 ```
+
+## Ingestion dati (Fase 3)
+
+Dataset: [Chinook](https://github.com/lerocha/chinook-database) (negozio
+musicale — artisti, album, tracce, clienti, fatture), distribuito come file
+SQLite. Lo script lo scarica e carica ogni tabella "così com'è" nello schema
+`raw` del database target (nessuna trasformazione: quella è compito di dbt).
+
+```bash
+python scripts/ingest_chinook.py
+```
+
+Usa lo stesso `DBT_DATABASE_PATH` di `profiles.yml`, quindi dbt e ingestion
+scrivono/leggono sempre lo stesso file DuckDB.

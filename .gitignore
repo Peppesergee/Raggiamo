@@ -20,5 +20,8 @@ logs/
 # Chroma / vector store (fase RAG)
 chroma_db/
 
+# Cache download sorgenti ingestion (rigenerabile con scripts/ingest_*.py)
+.cache/
+
 # OS
 .DS_Store

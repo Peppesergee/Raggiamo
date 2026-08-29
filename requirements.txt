@@ -1,5 +1,12 @@
-# Dipendenze core del progetto (Fase 1: solo dbt + adapter DuckDB).
+# Dipendenze core del progetto.
 # Pin sulle versioni testate — verranno aggiunte langchain/langgraph/chromadb
 # nelle fasi successive (RAG, agente).
+
+# Fase 1-2: dbt + adapter DuckDB
 dbt-core==1.12.3
 dbt-duckdb==1.11.0
+
+# Fase 3: ingestion (scripts/ingest_chinook.py)
+pandas==3.0.5
+SQLAlchemy==2.0.52
+duckdb-engine==0.17.0

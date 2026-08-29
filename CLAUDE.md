@@ -56,11 +56,19 @@ locale con GPU): venv con `dbt-core` 1.12.3 + `dbt-duckdb` 1.11.0.
 
 **Fase 2 (parziale)**: progetto dbt generato in `raggiamo/` (`dbt init`).
 Creato `raggiamo/profiles.yml` (committato: nessuna credenziale, solo path
-DuckDB via `env_var()`), verificato con `dbt debug` (connessione OK).
-Prossimo passo: sostituire i modelli di esempio generati da `dbt init`
-(`models/example/`) con il primo modello reale, dopo aver ingestionato un
-dataset (Fase 3) — per ora capire ref/source e materializzazioni sui modelli
-di esempio.
+DuckDB via `env_var()`), verificato con `dbt debug` (connessione OK). I
+modelli di esempio (`models/example/`) sono ancora quelli generati da
+`dbt init`, da sostituire col primo modello reale.
+
+**Fase 3 completata**: dataset scelto **Chinook** (negozio musicale:
+artisti, album, tracce, clienti, fatture — relazionale, buono per lineage
+multi-tabella). `scripts/ingest_chinook.py` scarica il file SQLite
+ufficiale e carica ogni tabella in DuckDB nello schema `raw` (via
+SQLAlchemy + `duckdb-engine`), idempotente (`if_exists="replace"`).
+Verificato: 11 tabelle in `raw.*` nel database usato da dbt.
+Prossimo passo: definire i `source()` dbt su `raw.*` e i primi modelli di
+staging (Fase 2/4 di fatto si intrecciano qui — i modelli di esempio
+verranno sostituiti da modelli reali su Chinook).
 
 ## Stile di lavoro richiesto
 - Risposte sintetiche e precise, linguaggio comprensibile anche a chi non è
