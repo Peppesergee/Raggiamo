@@ -1,0 +1,5 @@
+# Dipendenze core del progetto (Fase 1: solo dbt + adapter DuckDB).
+# Pin sulle versioni testate — verranno aggiunte langchain/langgraph/chromadb
+# nelle fasi successive (RAG, agente).
+dbt-core==1.12.3
+dbt-duckdb==1.11.0

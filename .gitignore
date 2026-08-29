@@ -1,0 +1,22 @@
+# Virtual environment
+.venv/
+venv/
+
+# Python
+__pycache__/
+*.pyc
+
+# dbt
+target/
+dbt_packages/
+logs/
+.user.yml
+
+# Env / secrets
+.env
+
+# Chroma / vector store (fase RAG)
+chroma_db/
+
+# OS
+.DS_Store
