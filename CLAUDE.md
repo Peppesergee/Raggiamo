@@ -54,21 +54,25 @@ database (tool-calling), spiegando dipendenze, lineage, problemi nei dati.
 **Fase 1 completata** (tranne Ollama, rimandato a quando si lavora in
 locale con GPU): venv con `dbt-core` 1.12.3 + `dbt-duckdb` 1.11.0.
 
-**Fase 2 (parziale)**: progetto dbt generato in `raggiamo/` (`dbt init`).
-Creato `raggiamo/profiles.yml` (committato: nessuna credenziale, solo path
-DuckDB via `env_var()`), verificato con `dbt debug` (connessione OK). I
-modelli di esempio (`models/example/`) sono ancora quelli generati da
-`dbt init`, da sostituire col primo modello reale.
+**Fase 2 completata**: progetto dbt generato in `raggiamo/` (`dbt init`).
+`raggiamo/profiles.yml` committato (nessuna credenziale, solo path DuckDB
+via `env_var()`), verificato con `dbt debug`. Modelli di esempio rimossi.
 
 **Fase 3 completata**: dataset scelto **Chinook** (negozio musicale:
 artisti, album, tracce, clienti, fatture — relazionale, buono per lineage
 multi-tabella). `scripts/ingest_chinook.py` scarica il file SQLite
 ufficiale e carica ogni tabella in DuckDB nello schema `raw` (via
 SQLAlchemy + `duckdb-engine`), idempotente (`if_exists="replace"`).
-Verificato: 11 tabelle in `raw.*` nel database usato da dbt.
-Prossimo passo: definire i `source()` dbt su `raw.*` e i primi modelli di
-staging (Fase 2/4 di fatto si intrecciano qui — i modelli di esempio
-verranno sostituiti da modelli reali su Chinook).
+
+**Fase 2/4 (staging)**: `raggiamo/models/staging/chinook/` — un modello
+1:1 per ciascuna delle 11 tabelle `raw.*` (rinomina snake_case + cast,
+niente logica di business), con `source.yml` e test (`unique`, `not_null`,
+`relationships` sulle FK). `dbt build`: 11 view + 30 test, tutti verdi
+(dataset pulito, nessuna anomalia nelle FK).
+Prossimo passo: modelli intermedi/marts (es. fatturato per cliente/artista,
+o una tabella "denormalizzata" comoda da far interrogare all'agente) —
+Fase 4 vera e propria inizia dopo, con RAG sulla documentazione di questi
+modelli.
 
 ## Stile di lavoro richiesto
 - Risposte sintetiche e precise, linguaggio comprensibile anche a chi non è

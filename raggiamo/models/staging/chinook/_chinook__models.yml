@@ -1,0 +1,128 @@
+version: 2
+
+models:
+  - name: stg_chinook__artists
+    description: Un artista musicale (una riga per artista).
+    columns:
+      - name: artist_id
+        data_tests: [unique, not_null]
+
+  - name: stg_chinook__albums
+    description: Un album, collegato a un artista.
+    columns:
+      - name: album_id
+        data_tests: [unique, not_null]
+      - name: artist_id
+        data_tests:
+          - relationships:
+              arguments:
+                to: ref('stg_chinook__artists')
+                field: artist_id
+
+  - name: stg_chinook__genres
+    description: Un genere musicale.
+    columns:
+      - name: genre_id
+        data_tests: [unique, not_null]
+
+  - name: stg_chinook__media_types
+    description: Un formato/tipo di file audio (es. MPEG, AAC).
+    columns:
+      - name: media_type_id
+        data_tests: [unique, not_null]
+
+  - name: stg_chinook__tracks
+    description: Una traccia musicale, collegata ad album, genere e media type.
+    columns:
+      - name: track_id
+        data_tests: [unique, not_null]
+      - name: album_id
+        data_tests:
+          - relationships:
+              arguments:
+                to: ref('stg_chinook__albums')
+                field: album_id
+      - name: genre_id
+        data_tests:
+          - relationships:
+              arguments:
+                to: ref('stg_chinook__genres')
+                field: genre_id
+      - name: media_type_id
+        data_tests:
+          - relationships:
+              arguments:
+                to: ref('stg_chinook__media_types')
+                field: media_type_id
+
+  - name: stg_chinook__playlists
+    description: Una playlist.
+    columns:
+      - name: playlist_id
+        data_tests: [unique, not_null]
+
+  - name: stg_chinook__playlist_tracks
+    description: >
+      Tabella ponte molti-a-molti tra playlist e tracce (una riga per
+      ogni traccia presente in una playlist).
+    columns:
+      - name: playlist_id
+        data_tests:
+          - relationships:
+              arguments:
+                to: ref('stg_chinook__playlists')
+                field: playlist_id
+      - name: track_id
+        data_tests:
+          - relationships:
+              arguments:
+                to: ref('stg_chinook__tracks')
+                field: track_id
+
+  - name: stg_chinook__customers
+    description: Un cliente del negozio.
+    columns:
+      - name: customer_id
+        data_tests: [unique, not_null]
+      - name: support_rep_employee_id
+        data_tests:
+          - relationships:
+              arguments:
+                to: ref('stg_chinook__employees')
+                field: employee_id
+
+  - name: stg_chinook__employees
+    description: Un dipendente. `reports_to_employee_id` punta a un altro employee_id (gerarchia interna).
+    columns:
+      - name: employee_id
+        data_tests: [unique, not_null]
+
+  - name: stg_chinook__invoices
+    description: Una fattura, collegata a un cliente.
+    columns:
+      - name: invoice_id
+        data_tests: [unique, not_null]
+      - name: customer_id
+        data_tests:
+          - relationships:
+              arguments:
+                to: ref('stg_chinook__customers')
+                field: customer_id
+
+  - name: stg_chinook__invoice_lines
+    description: Una riga di fattura (una traccia acquistata in una fattura).
+    columns:
+      - name: invoice_line_id
+        data_tests: [unique, not_null]
+      - name: invoice_id
+        data_tests:
+          - relationships:
+              arguments:
+                to: ref('stg_chinook__invoices')
+                field: invoice_id
+      - name: track_id
+        data_tests:
+          - relationships:
+              arguments:
+                to: ref('stg_chinook__tracks')
+                field: track_id

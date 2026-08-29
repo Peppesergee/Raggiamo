@@ -1,0 +1,22 @@
+version: 2
+
+sources:
+  - name: chinook
+    description: >
+      Dati grezzi del dataset Chinook (negozio musicale), caricati da
+      `scripts/ingest_chinook.py` nello schema `raw`. Tabelle così come
+      arrivano dalla sorgente SQLite: nessuna rinomina né trasformazione
+      (quello è compito dei modelli di staging).
+    schema: raw
+    tables:
+      - name: artist
+      - name: album
+      - name: track
+      - name: genre
+      - name: mediatype
+      - name: playlist
+      - name: playlisttrack
+      - name: customer
+      - name: employee
+      - name: invoice
+      - name: invoiceline

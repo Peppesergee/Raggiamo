@@ -48,3 +48,16 @@ python scripts/ingest_chinook.py
 
 Usa lo stesso `DBT_DATABASE_PATH` di `profiles.yml`, quindi dbt e ingestion
 scrivono/leggono sempre lo stesso file DuckDB.
+
+## Modelli di staging (Fase 2/4)
+
+`raggiamo/models/staging/chinook/` contiene un modello di staging per
+ciascuna delle 11 tabelle `raw.*` (rinomina in snake_case + cast dei tipi,
+nessun'altra trasformazione), con `source.yml`/`schema.yml` che documentano
+sorgenti, colonne e i test (`unique`, `not_null`, `relationships` sulle
+foreign key).
+
+```bash
+cd raggiamo
+DBT_PROFILES_DIR=. dbt build   # materializza i modelli + esegue i test
+```
