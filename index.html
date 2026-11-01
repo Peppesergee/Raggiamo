@@ -21,7 +21,7 @@
     <input id="search" type="search" placeholder="Cerca in dispensa…">
     <div id="chips" class="chips"></div>
     <ul id="pantry-list"></ul>
-    <p id="pantry-empty" class="empty">La dispensa è vuota.<br>Scansiona uno scontrino con il pulsante 📷.</p>
+    <p id="pantry-empty" class="empty">La dispensa è vuota.<br>Scatta una foto dello scontrino con 📷<br>o scegline una già fatta con 🖼️.</p>
   </section>
 
   <section id="view-review" hidden>
@@ -38,8 +38,10 @@
 
 <nav id="fab">
   <button id="btn-manual" class="secondary" aria-label="Aggiungi a mano">✏️ Manuale</button>
-  <button id="btn-scan">📷 Scansiona scontrino</button>
+  <button id="btn-gallery" class="secondary" aria-label="Scegli una foto dalla galleria">🖼️ Galleria</button>
+  <button id="btn-scan">📷 Scatta</button>
   <input id="file" type="file" accept="image/*" capture="environment" hidden>
+  <input id="file-gallery" type="file" accept="image/*" hidden>
 </nav>
 
 <div id="loading" hidden><div class="spinner"></div><p>Leggo lo scontrino…</p></div>

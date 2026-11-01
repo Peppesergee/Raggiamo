@@ -1,5 +1,5 @@
 'use strict';
-const VERSION = '0.0.4';
+const VERSION = '0.0.5';
 const $ = s => document.querySelector(s);
 const MODELS = { veloce: 'gemini-flash-lite-latest', preciso: 'gemini-flash-latest' };
 const model = () => MODELS[load('model', 'veloce')] || MODELS.veloce;
@@ -122,21 +122,34 @@ $('#review-confirm').onclick = () => {
 $('#btn-manual').onclick = () => showReview([{ name: '', qty: 1, unit: 'pz', cat: 'altro' }]);
 
 // ---------- Scansione scontrino ----------
-$('#btn-scan').onclick = () => {
-  if (!load('apiKey', '')) { toast('Inserisci prima la chiave API nelle impostazioni'); $('#dlg-settings').showModal(); return; }
-  $('#file').click();
+const needKey = () => {
+  if (load('apiKey', '')) return false;
+  toast('Inserisci prima la chiave API nelle impostazioni'); $('#dlg-settings').showModal(); return true;
 };
-$('#file').addEventListener('change', async e => {
+$('#btn-scan').onclick = () => { if (!needKey()) $('#file').click(); };
+$('#btn-gallery').onclick = () => { if (!needKey()) $('#file-gallery').click(); };
+const onPhoto = async e => {
   const f = e.target.files[0]; e.target.value = '';
   if (!f) return;
   $('#loading').hidden = false;
   try { showReview(await readReceipt(await shrink(f), s => $('#loading p').textContent = s)); }
   catch (err) { showError(err.message); }
   finally { $('#loading').hidden = true; $('#loading p').textContent = 'Leggo lo scontrino…'; }
-});
+};
+$('#file').addEventListener('change', onPhoto);
+$('#file-gallery').addEventListener('change', onPhoto);
 
 async function shrink(file, max = 1400) {
-  const bmp = await createImageBitmap(file);
+  let bmp;
+  try { bmp = await createImageBitmap(file); }
+  catch {
+    // Alcuni formati (es. HEIC) si leggono solo tramite <img>.
+    bmp = await new Promise((ok, ko) => {
+      const img = new Image(); img.onload = () => ok(img);
+      img.onerror = () => ko(new Error('formato immagine non supportato'));
+      img.src = URL.createObjectURL(file);
+    });
+  }
   const k = Math.min(1, max / Math.max(bmp.width, bmp.height));
   const c = document.createElement('canvas');
   c.width = Math.round(bmp.width * k); c.height = Math.round(bmp.height * k);
