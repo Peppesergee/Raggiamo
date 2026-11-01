@@ -1,5 +1,5 @@
 'use strict';
-const VERSION = '0.0.1';
+const VERSION = '0.0.2';
 const $ = s => document.querySelector(s);
 const MODEL = 'gemini-flash-latest';
 const UNITS = ['pz', 'kg', 'g', 'l', 'ml'];
@@ -134,13 +134,13 @@ $('#file').addEventListener('change', async e => {
   finally { $('#loading').hidden = true; }
 });
 
-async function shrink(file, max = 1800) {
+async function shrink(file, max = 1400) {
   const bmp = await createImageBitmap(file);
   const k = Math.min(1, max / Math.max(bmp.width, bmp.height));
   const c = document.createElement('canvas');
   c.width = Math.round(bmp.width * k); c.height = Math.round(bmp.height * k);
   c.getContext('2d').drawImage(bmp, 0, 0, c.width, c.height);
-  return c.toDataURL('image/jpeg', 0.85).split(',')[1];
+  return c.toDataURL('image/jpeg', 0.75).split(',')[1];
 }
 
 const PROMPT = `Questa è la foto di uno scontrino della spesa italiano. Estrai SOLO i prodotti alimentari e le bevande (ignora detersivi, igiene, sacchetti, sconti, totali).
@@ -200,6 +200,29 @@ $('#btn-export').onclick = () => {
   const a = document.createElement('a');
   a.href = URL.createObjectURL(new Blob([JSON.stringify(pantry, null, 2)], { type: 'application/json' }));
   a.download = 'dispensa.json'; a.click();
+};
+
+// ---------- Test connessione ----------
+$('#btn-test').onclick = async () => {
+  const out = $('#test-out'); out.hidden = false;
+  const key = $('#api-key').value.replace(/[^\x21-\x7e]/g, '') || load('apiKey', '');
+  const base = 'https://generativelanguage.googleapis.com/v1beta/models';
+  const steps = [
+    ['1. Raggiungo Google', () => fetch(base + '?key=' + encodeURIComponent(key))],
+    ['2. Chiedo una risposta', () => fetch(`${base}/${MODEL}:generateContent?key=${encodeURIComponent(key)}`, {
+      method: 'POST', headers: { 'content-type': 'text/plain' },
+      body: JSON.stringify({ contents: [{ parts: [{ text: 'Rispondi solo: ok' }] }] }) })],
+  ];
+  const lines = [];
+  for (const [label, run] of steps) {
+    lines.push(label + ': …'); out.textContent = lines.join('\n');
+    let r;
+    try { r = await run(); } catch (err) { lines[lines.length - 1] = `${label}: ❌ bloccato (${err.message})`; break; }
+    const body = await r.json().catch(() => ({}));
+    lines[lines.length - 1] = r.ok ? `${label}: ✅` : `${label}: ❌ ${r.status} ${body.error?.message || ''}`.trim();
+    if (!r.ok) break;
+  }
+  out.textContent = lines.join('\n');
 };
 
 // ---------- Avvio ----------

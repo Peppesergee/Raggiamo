@@ -40,3 +40,4 @@ li.empty{display:block;background:none;text-align:center}
 #review-list .c{flex:1 1 100%}
 #pantry-list{gap:6px}
 h1 small{font-size:.7rem;font-weight:500;color:var(--m);margin-left:4px}
+#test-out{white-space:pre-wrap;font-size:.85rem;background:var(--bg);padding:10px;border-radius:10px;margin:8px 0}
