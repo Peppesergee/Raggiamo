@@ -1,7 +1,8 @@
 'use strict';
-const VERSION = '0.0.2';
+const VERSION = '0.0.3';
 const $ = s => document.querySelector(s);
-const MODEL = 'gemini-flash-latest';
+const MODELS = { veloce: 'gemini-flash-lite-latest', preciso: 'gemini-flash-latest' };
+const model = () => MODELS[load('model', 'veloce')] || MODELS.veloce;
 const UNITS = ['pz', 'kg', 'g', 'l', 'ml'];
 const CATS = {
   pasta: ['🍝', 'Pasta e riso'], carne: ['🥩', 'Carne e pesce'], latt: ['🥛', 'Latticini e uova'],
@@ -129,9 +130,9 @@ $('#file').addEventListener('change', async e => {
   const f = e.target.files[0]; e.target.value = '';
   if (!f) return;
   $('#loading').hidden = false;
-  try { showReview(await readReceipt(await shrink(f))); }
+  try { showReview(await readReceipt(await shrink(f), s => $('#loading p').textContent = s)); }
   catch (err) { showError(err.message); }
-  finally { $('#loading').hidden = true; }
+  finally { $('#loading').hidden = true; $('#loading p').textContent = 'Leggo lo scontrino…'; }
 });
 
 async function shrink(file, max = 1400) {
@@ -149,38 +150,66 @@ Quantità: usa il numero di confezioni (unit "pz"), oppure il peso/volume se ven
 Se una riga ha moltiplicatore (es. "3 x") usa quel numero di pezzi.
 Assegna a ogni prodotto una categoria "cat" tra: pasta (pasta, riso, farine, pane), carne (carne, pesce, salumi), latt (latticini, formaggi, uova), colaz (biscotti da colazione, cereali, caffè, marmellate), ortof (frutta e verdura), cons (conserve, legumi, scatolame), cond (olio, aceto, spezie, salse), bev (acqua, succhi, bibite, vino), dolci (cioccolato, snack, dolci), altro.\nRispondi SOLO con un array JSON, senza testo aggiuntivo: [{"name": string, "qty": number, "unit": "pz"|"kg"|"g"|"l"|"ml", "cat": string}]`;
 
-async function readReceipt(b64) {
+// Chiamata a Gemini in streaming: il testo arriva a pezzi, così la connessione non resta muta.
+async function gemini(parts, onProgress = () => {}, idleMs = 60000) {
+  const key = load('apiKey', '').replace(/[^\x21-\x7e]/g, '');
   const ctl = new AbortController();
-  const timer = setTimeout(() => ctl.abort(), 90000);
-  let res;
+  let timer; const arm = () => { clearTimeout(timer); timer = setTimeout(() => ctl.abort(), idleMs); };
+  const t0 = Date.now();
+  const tick = setInterval(() => onProgress(`Leggo lo scontrino… ${Math.round((Date.now() - t0) / 1000)} s`), 1000);
+  arm();
   try {
-    const key = load('apiKey', '').replace(/[^\x21-\x7e]/g, '');
-    res = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/${MODEL}:generateContent?key=${encodeURIComponent(key)}`, {
-      method: 'POST', signal: ctl.signal,
-      headers: { 'content-type': 'text/plain' },
-      body: JSON.stringify({
-        contents: [{ parts: [
-          { inline_data: { mime_type: 'image/jpeg', data: b64 } },
-          { text: PROMPT },
-        ] }],
-        generationConfig: { responseMimeType: 'application/json', temperature: 0, maxOutputTokens: 8192 },
-      }),
-    });
-  } catch (err) {
-    throw new Error(err.name === 'AbortError' ? 'tempo scaduto (90 s), riprova con una foto più nitida' : `richiesta non riuscita (${err.message})`);
-  } finally { clearTimeout(timer); }
-  const data = await res.json().catch(() => ({}));
-  if (!res.ok) {
-    const msg = data.error?.message || '';
-    throw new Error(res.status === 429 ? 'limite gratuito raggiunto, riprova più tardi'
-      : `Gemini ha risposto ${res.status}${msg ? ': ' + msg.slice(0, 200) : ''}`);
-  }
-  const cand = data.candidates?.[0];
-  const text = (cand?.content?.parts || []).map(p => p.text || '').join('');
-  if (!text) throw new Error(`nessuna risposta (${data.promptFeedback?.blockReason || cand?.finishReason || 'vuota'})`);
+    let res;
+    try {
+      res = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/${model()}:streamGenerateContent?alt=sse&key=${encodeURIComponent(key)}`, {
+        method: 'POST', signal: ctl.signal, headers: { 'content-type': 'text/plain' },
+        body: JSON.stringify({ contents: [{ parts }], generationConfig: { temperature: 0, maxOutputTokens: 8192 } }),
+      });
+    } catch (err) {
+      throw new Error(err.name === 'AbortError' ? `nessuna risposta da Gemini in ${idleMs / 1000} s` : `richiesta bloccata (${err.message})`);
+    }
+    if (!res.ok) {
+      const data = await res.json().catch(() => ({}));
+      const msg = data.error?.message || (Array.isArray(data) && data[0]?.error?.message) || '';
+      throw new Error(res.status === 429 ? 'limite gratuito raggiunto, riprova più tardi'
+        : `Gemini ha risposto ${res.status}${msg ? ': ' + msg.slice(0, 200) : ''}`);
+    }
+    const reader = res.body.getReader(), dec = new TextDecoder();
+    let buf = '', text = '', finish = '';
+    try {
+      for (;;) {
+        const { done, value } = await reader.read();
+        if (done) break;
+        arm();
+        buf += dec.decode(value, { stream: true });
+        let i;
+        while ((i = buf.indexOf('\n')) >= 0) {
+          const line = buf.slice(0, i).trim(); buf = buf.slice(i + 1);
+          if (!line.startsWith('data:')) continue;
+          try {
+            const d = JSON.parse(line.slice(5));
+            const c = d.candidates?.[0];
+            text += (c?.content?.parts || []).filter(p => !p.thought).map(p => p.text || '').join('');
+            finish = c?.finishReason || d.promptFeedback?.blockReason || finish;
+          } catch {}
+        }
+      }
+    } catch (err) {
+      throw new Error(err.name === 'AbortError' ? `Gemini si è fermato per ${idleMs / 1000} s` : `connessione interrotta (${err.message})`);
+    }
+    if (!text) throw new Error(`nessuna risposta (${finish || 'vuota'})`);
+    return text;
+  } finally { clearTimeout(timer); clearInterval(tick); }
+}
+
+async function readReceipt(b64, onProgress) {
+  const text = await gemini([
+    { inline_data: { mime_type: 'image/jpeg', data: b64 } },
+    { text: PROMPT },
+  ], onProgress);
   let parsed;
-  try { parsed = JSON.parse(text); }
-  catch { const m = text.match(/\[[\s\S]*\]/); try { parsed = m && JSON.parse(m[0]); } catch {} }
+  const m = text.match(/\[[\s\S]*\]/);
+  try { parsed = JSON.parse(m ? m[0] : text); } catch {}
   if (parsed && !Array.isArray(parsed)) parsed = Object.values(parsed).find(Array.isArray);
   if (!Array.isArray(parsed)) throw new Error('risposta non comprensibile: ' + text.slice(0, 120));
   const items = parsed
@@ -191,8 +220,8 @@ async function readReceipt(b64) {
 }
 
 // ---------- Impostazioni ----------
-$('#btn-settings').onclick = () => { $('#api-key').value = load('apiKey', ''); $('#dlg-settings').showModal(); };
-$('#save-settings').onclick = () => save('apiKey', $('#api-key').value.replace(/[^\x21-\x7e]/g, ''));
+$('#btn-settings').onclick = () => { $('#api-key').value = load('apiKey', ''); $('#model').value = load('model', 'veloce'); $('#dlg-settings').showModal(); };
+$('#save-settings').onclick = () => { save('apiKey', $('#api-key').value.replace(/[^\x21-\x7e]/g, '')); save('model', $('#model').value); };
 $('#btn-clear').onclick = () => {
   if (confirm('Svuotare tutta la dispensa?')) { pantry = []; persist(); renderPantry(); $('#dlg-settings').close(); }
 };
@@ -203,26 +232,34 @@ $('#btn-export').onclick = () => {
 };
 
 // ---------- Test connessione ----------
+function sampleImage() {
+  const c = document.createElement('canvas'); c.width = 320; c.height = 120;
+  const g = c.getContext('2d'); g.fillStyle = '#fff'; g.fillRect(0, 0, 320, 120);
+  g.fillStyle = '#000'; g.font = '20px monospace';
+  g.fillText('LATTE PS UHT 1L   1,29', 10, 40); g.fillText('PENNE RIGATE 500G 0,89', 10, 80);
+  return c.toDataURL('image/jpeg', 0.8).split(',')[1];
+}
 $('#btn-test').onclick = async () => {
   const out = $('#test-out'); out.hidden = false;
-  const key = $('#api-key').value.replace(/[^\x21-\x7e]/g, '') || load('apiKey', '');
-  const base = 'https://generativelanguage.googleapis.com/v1beta/models';
+  const typed = $('#api-key').value.replace(/[^\x21-\x7e]/g, '');
+  if (typed) save('apiKey', typed);
+  const key = load('apiKey', '');
   const steps = [
-    ['1. Raggiungo Google', () => fetch(base + '?key=' + encodeURIComponent(key))],
-    ['2. Chiedo una risposta', () => fetch(`${base}/${MODEL}:generateContent?key=${encodeURIComponent(key)}`, {
-      method: 'POST', headers: { 'content-type': 'text/plain' },
-      body: JSON.stringify({ contents: [{ parts: [{ text: 'Rispondi solo: ok' }] }] }) })],
+    ['1. Raggiungo Google', async () => {
+      const r = await fetch('https://generativelanguage.googleapis.com/v1beta/models?key=' + encodeURIComponent(key));
+      if (!r.ok) throw new Error(r.status + ' ' + ((await r.json().catch(() => ({}))).error?.message || ''));
+    }],
+    ['2. Risposta di testo', () => gemini([{ text: 'Rispondi solo: ok' }])],
+    ['3. Lettura di un\'immagine', () => gemini([{ inline_data: { mime_type: 'image/jpeg', data: sampleImage() } }, { text: 'Trascrivi il testo.' }])],
   ];
   const lines = [];
   for (const [label, run] of steps) {
+    const t0 = Date.now();
     lines.push(label + ': …'); out.textContent = lines.join('\n');
-    let r;
-    try { r = await run(); } catch (err) { lines[lines.length - 1] = `${label}: ❌ bloccato (${err.message})`; break; }
-    const body = await r.json().catch(() => ({}));
-    lines[lines.length - 1] = r.ok ? `${label}: ✅` : `${label}: ❌ ${r.status} ${body.error?.message || ''}`.trim();
-    if (!r.ok) break;
+    try { await run(); lines[lines.length - 1] = `${label}: ✅ ${((Date.now() - t0) / 1000).toFixed(1)} s`; }
+    catch (err) { lines[lines.length - 1] = `${label}: ❌ ${err.message}`; out.textContent = lines.join('\n'); break; }
+    out.textContent = lines.join('\n');
   }
-  out.textContent = lines.join('\n');
 };
 
 // ---------- Avvio ----------
