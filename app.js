@@ -1,4 +1,5 @@
 'use strict';
+const VERSION = '0.0.1';
 const $ = s => document.querySelector(s);
 const MODEL = 'gemini-flash-latest';
 const UNITS = ['pz', 'kg', 'g', 'l', 'ml'];
@@ -202,5 +203,17 @@ $('#btn-export').onclick = () => {
 };
 
 // ---------- Avvio ----------
+$('#version').textContent = 'v' + VERSION;
+$('#btn-update').onclick = async () => {
+  try {
+    for (const r of await navigator.serviceWorker.getRegistrations()) await r.unregister();
+    for (const k of await caches.keys()) await caches.delete(k);
+  } catch {}
+  location.reload();
+};
 renderPantry();
-if ('serviceWorker' in navigator) navigator.serviceWorker.register('sw.js').catch(() => {});
+if ('serviceWorker' in navigator) {
+  const had = !!navigator.serviceWorker.controller;
+  navigator.serviceWorker.register('sw.js', { updateViaCache: 'none' }).catch(() => {});
+  navigator.serviceWorker.addEventListener('controllerchange', () => { if (had) location.reload(); });
+}

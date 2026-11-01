@@ -39,3 +39,4 @@ li.gh{background:var(--bg);border-radius:0;padding:12px 0 2px;font-size:.78rem;f
 li.empty{display:block;background:none;text-align:center}
 #review-list .c{flex:1 1 100%}
 #pantry-list{gap:6px}
+h1 small{font-size:.7rem;font-weight:500;color:var(--m);margin-left:4px}
