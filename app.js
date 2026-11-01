@@ -2,11 +2,18 @@
 const $ = s => document.querySelector(s);
 const MODEL = 'gemini-flash-latest';
 const UNITS = ['pz', 'kg', 'g', 'l', 'ml'];
+const CATS = {
+  pasta: ['🍝', 'Pasta e riso'], carne: ['🥩', 'Carne e pesce'], latt: ['🥛', 'Latticini e uova'],
+  colaz: ['🥣', 'Colazione'], ortof: ['🥬', 'Frutta e verdura'], cons: ['🥫', 'Conserve e legumi'],
+  cond: ['🫒', 'Condimenti'], bev: ['🧃', 'Bevande'], dolci: ['🍪', 'Dolci e snack'], altro: ['🛒', 'Altro'],
+};
+const catOf = c => (c in CATS ? c : 'altro');
 
 // ---------- Archivio (localStorage) ----------
 const load = (k, d) => { try { return JSON.parse(localStorage.getItem(k)) ?? d; } catch { return d; } };
 const save = (k, v) => localStorage.setItem(k, JSON.stringify(v));
-let pantry = load('pantry', []);   // [{id, name, qty, unit}]
+let pantry = load('pantry', []).map(p => ({ ...p, cat: catOf(p.cat) }));   // [{id, name, qty, unit, cat}]
+let filter = 'all';
 const persist = () => save('pantry', pantry);
 
 const uid = () => Date.now().toString(36) + Math.random().toString(36).slice(2, 6);
@@ -20,23 +27,39 @@ function toast(msg) {
 }
 
 // ---------- Dispensa ----------
-function addToPantry(name, qty, unit) {
+function addToPantry(name, qty, unit, cat) {
   const existing = pantry.find(p => norm(p.name) === norm(name) && p.unit === unit);
   if (existing) existing.qty += qty;
-  else pantry.push({ id: uid(), name: name.trim(), qty, unit });
+  else pantry.push({ id: uid(), name: name.trim(), qty, unit, cat: catOf(cat) });
 }
 
 function renderPantry() {
   const q = norm($('#search').value);
-  const items = pantry.filter(p => norm(p.name).includes(q)).sort((a, b) => a.name.localeCompare(b.name, 'it'));
+  const present = Object.keys(CATS).filter(k => pantry.some(p => p.cat === k));
+  if (filter !== 'all' && !present.includes(filter)) filter = 'all';
+  $('#chips').hidden = pantry.length === 0;
+  $('#chips').innerHTML = ['all', ...present].map(k =>
+    `<button class="chip" aria-pressed="${filter === k}" data-f="${k}">${k === 'all' ? 'Tutte' : CATS[k][0] + ' ' + CATS[k][1]}</button>`).join('');
   $('#pantry-empty').hidden = pantry.length > 0;
-  $('#pantry-list').innerHTML = items.map(p => `
-    <li data-id="${p.id}">
-      <span class="name">${esc(p.name)}</span>
-      <span class="qty">${fmt(p.qty)} ${p.unit}</span>
-      <button class="secondary" data-act="consume">Consuma</button>
-    </li>`).join('');
+  let html = '';
+  for (const k of present) {
+    if (filter !== 'all' && filter !== k) continue;
+    const list = pantry.filter(p => p.cat === k && norm(p.name).includes(q)).sort((a, b) => a.name.localeCompare(b.name, 'it'));
+    if (!list.length) continue;
+    html += `<li class="gh">${CATS[k][1]}</li>` + list.map(p => `
+      <li data-id="${p.id}">
+        <span class="name">${esc(p.name)}</span>
+        <span class="qty">${fmt(p.qty)} ${p.unit}</span>
+        <button class="secondary" data-act="consume">Consuma</button>
+      </li>`).join('');
+  }
+  if (!html && pantry.length) html = '<li class="empty">Nessun prodotto trovato</li>';
+  $('#pantry-list').innerHTML = html;
 }
+$('#chips').addEventListener('click', e => {
+  const b = e.target.closest('[data-f]'); if (!b) return;
+  filter = b.dataset.f; renderPantry();
+});
 
 let consumeId = null;
 $('#pantry-list').addEventListener('click', e => {
@@ -64,13 +87,14 @@ $('#consume-all').onclick = () => { const p = pantry.find(x => x.id === consumeI
 $('#search').addEventListener('input', renderPantry);
 
 // ---------- Revisione ----------
-function reviewRow(it = { name: '', qty: 1, unit: 'pz', checked: true }) {
+function reviewRow(it = { name: '', qty: 1, unit: 'pz', cat: 'altro', checked: true }) {
   const li = document.createElement('li');
   li.innerHTML = `
     <input type="checkbox" ${it.checked !== false ? 'checked' : ''}>
     <input class="n" value="${esc(it.name)}" placeholder="Prodotto">
     <input class="q" type="number" min="0" step="any" inputmode="decimal" value="${it.qty}">
-    <select class="u">${UNITS.map(u => `<option ${u === it.unit ? 'selected' : ''}>${u}</option>`).join('')}</select>`;
+    <select class="u">${UNITS.map(u => `<option ${u === it.unit ? 'selected' : ''}>${u}</option>`).join('')}</select>
+    <select class="c">${Object.entries(CATS).map(([k, [e, n]]) => `<option value="${k}" ${k === catOf(it.cat) ? 'selected' : ''}>${e} ${n}</option>`).join('')}</select>`;
   $('#review-list').append(li);
 }
 function showReview(items) {
@@ -84,13 +108,13 @@ $('#review-cancel').onclick = hideReview;
 $('#review-confirm').onclick = () => {
   let n = 0;
   for (const li of $('#review-list').children) {
-    const [chk, name, qty, unit] = li.querySelectorAll('input,select');
+    const [chk, name, qty, unit, cat] = li.querySelectorAll('input,select');
     const q = parseFloat(qty.value.replace(',', '.'));
-    if (chk.checked && name.value.trim() && q > 0) { addToPantry(name.value, q, unit.value); n++; }
+    if (chk.checked && name.value.trim() && q > 0) { addToPantry(name.value, q, unit.value, cat.value); n++; }
   }
   persist(); renderPantry(); hideReview(); toast(`${n} prodotti aggiunti`);
 };
-$('#btn-manual').onclick = () => showReview([{ name: '', qty: 1, unit: 'pz' }]);
+$('#btn-manual').onclick = () => showReview([{ name: '', qty: 1, unit: 'pz', cat: 'altro' }]);
 
 // ---------- Scansione scontrino ----------
 $('#btn-scan').onclick = () => {
@@ -119,7 +143,7 @@ const PROMPT = `Questa è la foto di uno scontrino della spesa italiano. Estrai 
 Per ogni voce espandi le abbreviazioni in un nome chiaro in italiano (es. "LATTE PS UHT 1L" -> "Latte UHT parzialmente scremato").
 Quantità: usa il numero di confezioni (unit "pz"), oppure il peso/volume se venduto a peso (unit "kg", "g", "l", "ml").
 Se una riga ha moltiplicatore (es. "3 x") usa quel numero di pezzi.
-Rispondi SOLO con un array JSON, senza testo aggiuntivo: [{"name": string, "qty": number, "unit": "pz"|"kg"|"g"|"l"|"ml"}]`;
+Assegna a ogni prodotto una categoria "cat" tra: pasta (pasta, riso, farine, pane), carne (carne, pesce, salumi), latt (latticini, formaggi, uova), colaz (biscotti da colazione, cereali, caffè, marmellate), ortof (frutta e verdura), cons (conserve, legumi, scatolame), cond (olio, aceto, spezie, salse), bev (acqua, succhi, bibite, vino), dolci (cioccolato, snack, dolci), altro.\nRispondi SOLO con un array JSON, senza testo aggiuntivo: [{"name": string, "qty": number, "unit": "pz"|"kg"|"g"|"l"|"ml", "cat": string}]`;
 
 async function readReceipt(b64) {
   const res = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/${MODEL}:generateContent`, {
@@ -144,7 +168,7 @@ async function readReceipt(b64) {
   if (!m) throw new Error('risposta non comprensibile');
   const items = JSON.parse(m[0])
     .filter(i => i && i.name)
-    .map(i => ({ name: String(i.name), qty: Number(i.qty) > 0 ? Number(i.qty) : 1, unit: UNITS.includes(i.unit) ? i.unit : 'pz', checked: true }));
+    .map(i => ({ name: String(i.name), qty: Number(i.qty) > 0 ? Number(i.qty) : 1, unit: UNITS.includes(i.unit) ? i.unit : 'pz', cat: catOf(i.cat), checked: true }));
   if (!items.length) throw new Error('nessun prodotto trovato');
   return items;
 }
