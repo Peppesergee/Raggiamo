@@ -1,5 +1,5 @@
 'use strict';
-const VERSION = '0.0.3';
+const VERSION = '0.0.4';
 const $ = s => document.querySelector(s);
 const MODELS = { veloce: 'gemini-flash-lite-latest', preciso: 'gemini-flash-latest' };
 const model = () => MODELS[load('model', 'veloce')] || MODELS.veloce;
@@ -146,8 +146,10 @@ async function shrink(file, max = 1400) {
 
 const PROMPT = `Questa è la foto di uno scontrino della spesa italiano. Estrai SOLO i prodotti alimentari e le bevande (ignora detersivi, igiene, sacchetti, sconti, totali).
 Per ogni voce espandi le abbreviazioni in un nome chiaro in italiano (es. "LATTE PS UHT 1L" -> "Latte UHT parzialmente scremato").
-Quantità: usa il numero di confezioni (unit "pz"), oppure il peso/volume se venduto a peso (unit "kg", "g", "l", "ml").
-Se una riga ha moltiplicatore (es. "3 x") usa quel numero di pezzi.
+Quantità:
+- Prodotti confezionati: usa il NUMERO DI CONFEZIONI con unit "pz". Il formato della confezione (es. 500G, 700G, 1L, 250G) NON è la quantità: mettilo nel nome (es. "Passata di pomodoro 700 g", qty 1, unit "pz").
+- Solo i prodotti venduti a peso variabile (frutta, verdura, carne, formaggi al banco, con il peso indicato in KG sulla riga) usano il peso: unit "kg".
+- Se una riga ha un moltiplicatore (es. "3 x 1,29") usa quel numero di confezioni. Se lo stesso prodotto compare su più righe, uniscile sommando le confezioni.
 Assegna a ogni prodotto una categoria "cat" tra: pasta (pasta, riso, farine, pane), carne (carne, pesce, salumi), latt (latticini, formaggi, uova), colaz (biscotti da colazione, cereali, caffè, marmellate), ortof (frutta e verdura), cons (conserve, legumi, scatolame), cond (olio, aceto, spezie, salse), bev (acqua, succhi, bibite, vino), dolci (cioccolato, snack, dolci), altro.\nRispondi SOLO con un array JSON, senza testo aggiuntivo: [{"name": string, "qty": number, "unit": "pz"|"kg"|"g"|"l"|"ml", "cat": string}]`;
 
 // Chiamata a Gemini in streaming: il testo arriva a pezzi, così la connessione non resta muta.
@@ -160,13 +162,17 @@ async function gemini(parts, onProgress = () => {}, idleMs = 60000) {
   arm();
   try {
     let res;
-    try {
-      res = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/${model()}:streamGenerateContent?alt=sse&key=${encodeURIComponent(key)}`, {
-        method: 'POST', signal: ctl.signal, headers: { 'content-type': 'text/plain' },
-        body: JSON.stringify({ contents: [{ parts }], generationConfig: { temperature: 0, maxOutputTokens: 8192 } }),
-      });
-    } catch (err) {
-      throw new Error(err.name === 'AbortError' ? `nessuna risposta da Gemini in ${idleMs / 1000} s` : `richiesta bloccata (${err.message})`);
+    // Se il modello scelto è sovraccarico (503/500) si prova l'altro.
+    for (const m of [model(), ...Object.values(MODELS).filter(x => x !== model())]) {
+      try {
+        res = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/${m}:streamGenerateContent?alt=sse&key=${encodeURIComponent(key)}`, {
+          method: 'POST', signal: ctl.signal, headers: { 'content-type': 'text/plain' },
+          body: JSON.stringify({ contents: [{ parts }], generationConfig: { temperature: 0, maxOutputTokens: 8192 } }),
+        });
+      } catch (err) {
+        throw new Error(err.name === 'AbortError' ? `nessuna risposta da Gemini in ${idleMs / 1000} s` : `richiesta bloccata (${err.message})`);
+      }
+      if (res.status !== 503 && res.status !== 500) break;
     }
     if (!res.ok) {
       const data = await res.json().catch(() => ({}));
