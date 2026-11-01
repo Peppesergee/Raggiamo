@@ -153,9 +153,10 @@ async function readReceipt(b64) {
   const timer = setTimeout(() => ctl.abort(), 90000);
   let res;
   try {
-    res = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/${MODEL}:generateContent`, {
+    const key = load('apiKey', '').replace(/[^\x21-\x7e]/g, '');
+    res = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/${MODEL}:generateContent?key=${encodeURIComponent(key)}`, {
       method: 'POST', signal: ctl.signal,
-      headers: { 'content-type': 'application/json', 'x-goog-api-key': load('apiKey', '') },
+      headers: { 'content-type': 'text/plain' },
       body: JSON.stringify({
         contents: [{ parts: [
           { inline_data: { mime_type: 'image/jpeg', data: b64 } },
@@ -165,7 +166,7 @@ async function readReceipt(b64) {
       }),
     });
   } catch (err) {
-    throw new Error(err.name === 'AbortError' ? 'tempo scaduto (90 s), riprova con una foto più nitida' : 'connessione assente o bloccata');
+    throw new Error(err.name === 'AbortError' ? 'tempo scaduto (90 s), riprova con una foto più nitida' : `richiesta non riuscita (${err.message})`);
   } finally { clearTimeout(timer); }
   const data = await res.json().catch(() => ({}));
   if (!res.ok) {
@@ -190,7 +191,7 @@ async function readReceipt(b64) {
 
 // ---------- Impostazioni ----------
 $('#btn-settings').onclick = () => { $('#api-key').value = load('apiKey', ''); $('#dlg-settings').showModal(); };
-$('#save-settings').onclick = () => save('apiKey', $('#api-key').value.trim());
+$('#save-settings').onclick = () => save('apiKey', $('#api-key').value.replace(/[^\x21-\x7e]/g, ''));
 $('#btn-clear').onclick = () => {
   if (confirm('Svuotare tutta la dispensa?')) { pantry = []; persist(); renderPantry(); $('#dlg-settings').close(); }
 };
