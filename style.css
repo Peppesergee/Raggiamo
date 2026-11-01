@@ -17,7 +17,7 @@ li .qty{color:var(--m);white-space:nowrap}
 li button{padding:8px 12px}
 #review-list li{flex-wrap:wrap}
 #review-list input[type=checkbox]{width:22px;height:22px}
-#review-list .n{flex:1 1 140px}#review-list .q{width:80px}#review-list .u{width:80px}
+#review-list .n{flex:1 1 140px}#review-list .q{width:70px}
 .empty,.hint{color:var(--m);text-align:center;font-size:.9rem}
 .hint{text-align:left}
 .actions{display:flex;gap:8px;justify-content:flex-end;margin-top:14px;flex-wrap:wrap}
