@@ -1,0 +1,82 @@
+<!doctype html>
+<html lang="it">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="theme-color" content="#2e7d32">
+<title>Raggiamo</title>
+<link rel="manifest" href="manifest.webmanifest">
+<link rel="icon" href="icons/icon-192.png">
+<link rel="apple-touch-icon" href="icons/icon-192.png">
+<link rel="stylesheet" href="style.css">
+</head>
+<body>
+<header>
+  <h1>🧺 Raggiamo</h1>
+  <button id="btn-settings" aria-label="Impostazioni">⚙️</button>
+</header>
+
+<main>
+  <section id="view-pantry">
+    <input id="search" type="search" placeholder="Cerca in dispensa…">
+    <ul id="pantry-list"></ul>
+    <p id="pantry-empty" class="empty">La dispensa è vuota.<br>Scansiona uno scontrino con il pulsante 📷.</p>
+  </section>
+
+  <section id="view-review" hidden>
+    <h2>Controlla i prodotti</h2>
+    <p class="hint">Correggi o togli la spunta a ciò che non vuoi aggiungere.</p>
+    <ul id="review-list"></ul>
+    <button id="review-add-row" class="secondary">+ Aggiungi riga</button>
+    <div class="actions">
+      <button id="review-cancel" class="secondary">Annulla</button>
+      <button id="review-confirm">Aggiungi alla dispensa</button>
+    </div>
+  </section>
+</main>
+
+<nav id="fab">
+  <button id="btn-manual" class="secondary" aria-label="Aggiungi a mano">✏️ Manuale</button>
+  <button id="btn-scan">📷 Scansiona scontrino</button>
+  <input id="file" type="file" accept="image/*" capture="environment" hidden>
+</nav>
+
+<div id="loading" hidden><div class="spinner"></div><p>Leggo lo scontrino…</p></div>
+
+<dialog id="dlg-settings">
+  <form method="dialog">
+    <h2>Impostazioni</h2>
+    <label>Chiave API Anthropic
+      <input id="api-key" type="password" placeholder="sk-ant-…" autocomplete="off">
+    </label>
+    <p class="hint">La chiave resta solo su questo dispositivo ed è usata per leggere gli scontrini.</p>
+    <div class="actions">
+      <button value="cancel" class="secondary">Chiudi</button>
+      <button id="save-settings" value="ok">Salva</button>
+    </div>
+    <hr>
+    <div class="actions">
+      <button type="button" id="btn-export" class="secondary">Esporta dati</button>
+      <button type="button" id="btn-clear" class="danger">Svuota dispensa</button>
+    </div>
+  </form>
+</dialog>
+
+<dialog id="dlg-consume">
+  <form method="dialog">
+    <h2 id="consume-title">Consuma</h2>
+    <label>Quantità consumata
+      <input id="consume-qty" type="number" min="0" step="any" inputmode="decimal">
+    </label>
+    <div class="actions">
+      <button value="cancel" class="secondary">Annulla</button>
+      <button id="consume-all" type="button" class="secondary">Finito</button>
+      <button id="consume-ok" value="ok">Conferma</button>
+    </div>
+  </form>
+</dialog>
+
+<div id="toast" hidden></div>
+<script src="app.js"></script>
+</body>
+</html>
