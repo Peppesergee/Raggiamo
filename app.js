@@ -21,6 +21,9 @@ const norm = s => s.trim().toLowerCase().replace(/\s+/g, ' ');
 const fmt = n => String(Math.round(n * 100) / 100).replace('.', ',');
 const esc = s => String(s).replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
 
+function showError(msg) {
+  $('#error-text').textContent = msg; $('#dlg-error').showModal();
+}
 function toast(msg) {
   const t = $('#toast'); t.textContent = msg; t.hidden = false;
   clearTimeout(toast.id); toast.id = setTimeout(() => t.hidden = true, 3000);
@@ -100,9 +103,9 @@ function reviewRow(it = { name: '', qty: 1, unit: 'pz', cat: 'altro', checked: t
 function showReview(items) {
   $('#review-list').innerHTML = '';
   items.forEach(reviewRow);
-  $('#view-pantry').hidden = true; $('#fab').hidden = true; $('#view-review').hidden = false;
+  $('#view-pantry').hidden = true; $('#fab').style.display = 'none'; $('#view-review').hidden = false;
 }
-function hideReview() { $('#view-review').hidden = true; $('#view-pantry').hidden = false; $('#fab').hidden = false; }
+function hideReview() { $('#view-review').hidden = true; $('#view-pantry').hidden = false; $('#fab').style.display = ''; }
 $('#review-add-row').onclick = () => reviewRow();
 $('#review-cancel').onclick = hideReview;
 $('#review-confirm').onclick = () => {
@@ -126,7 +129,7 @@ $('#file').addEventListener('change', async e => {
   if (!f) return;
   $('#loading').hidden = false;
   try { showReview(await readReceipt(await shrink(f))); }
-  catch (err) { toast('Errore: ' + err.message); }
+  catch (err) { showError(err.message); }
   finally { $('#loading').hidden = true; }
 });
 
@@ -146,30 +149,42 @@ Se una riga ha moltiplicatore (es. "3 x") usa quel numero di pezzi.
 Assegna a ogni prodotto una categoria "cat" tra: pasta (pasta, riso, farine, pane), carne (carne, pesce, salumi), latt (latticini, formaggi, uova), colaz (biscotti da colazione, cereali, caffè, marmellate), ortof (frutta e verdura), cons (conserve, legumi, scatolame), cond (olio, aceto, spezie, salse), bev (acqua, succhi, bibite, vino), dolci (cioccolato, snack, dolci), altro.\nRispondi SOLO con un array JSON, senza testo aggiuntivo: [{"name": string, "qty": number, "unit": "pz"|"kg"|"g"|"l"|"ml", "cat": string}]`;
 
 async function readReceipt(b64) {
-  const res = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/${MODEL}:generateContent`, {
-    method: 'POST',
-    headers: { 'content-type': 'application/json', 'x-goog-api-key': load('apiKey', '') },
-    body: JSON.stringify({
-      contents: [{ parts: [
-        { inline_data: { mime_type: 'image/jpeg', data: b64 } },
-        { text: PROMPT },
-      ] }],
-      generationConfig: { responseMimeType: 'application/json', temperature: 0 },
-    }),
-  });
+  const ctl = new AbortController();
+  const timer = setTimeout(() => ctl.abort(), 90000);
+  let res;
+  try {
+    res = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/${MODEL}:generateContent`, {
+      method: 'POST', signal: ctl.signal,
+      headers: { 'content-type': 'application/json', 'x-goog-api-key': load('apiKey', '') },
+      body: JSON.stringify({
+        contents: [{ parts: [
+          { inline_data: { mime_type: 'image/jpeg', data: b64 } },
+          { text: PROMPT },
+        ] }],
+        generationConfig: { responseMimeType: 'application/json', temperature: 0, maxOutputTokens: 8192 },
+      }),
+    });
+  } catch (err) {
+    throw new Error(err.name === 'AbortError' ? 'tempo scaduto (90 s), riprova con una foto più nitida' : 'connessione assente o bloccata');
+  } finally { clearTimeout(timer); }
+  const data = await res.json().catch(() => ({}));
   if (!res.ok) {
-    throw new Error(res.status === 400 || res.status === 403 ? 'chiave API non valida'
-      : res.status === 429 ? 'limite gratuito raggiunto, riprova più tardi'
-      : `servizio non disponibile (${res.status})`);
+    const msg = data.error?.message || '';
+    throw new Error(res.status === 429 ? 'limite gratuito raggiunto, riprova più tardi'
+      : `Gemini ha risposto ${res.status}${msg ? ': ' + msg.slice(0, 200) : ''}`);
   }
-  const data = await res.json();
-  const text = (data.candidates?.[0]?.content?.parts || []).map(p => p.text || '').join('');
-  const m = text.match(/\[[\s\S]*\]/);
-  if (!m) throw new Error('risposta non comprensibile');
-  const items = JSON.parse(m[0])
+  const cand = data.candidates?.[0];
+  const text = (cand?.content?.parts || []).map(p => p.text || '').join('');
+  if (!text) throw new Error(`nessuna risposta (${data.promptFeedback?.blockReason || cand?.finishReason || 'vuota'})`);
+  let parsed;
+  try { parsed = JSON.parse(text); }
+  catch { const m = text.match(/\[[\s\S]*\]/); try { parsed = m && JSON.parse(m[0]); } catch {} }
+  if (parsed && !Array.isArray(parsed)) parsed = Object.values(parsed).find(Array.isArray);
+  if (!Array.isArray(parsed)) throw new Error('risposta non comprensibile: ' + text.slice(0, 120));
+  const items = parsed
     .filter(i => i && i.name)
     .map(i => ({ name: String(i.name), qty: Number(i.qty) > 0 ? Number(i.qty) : 1, unit: UNITS.includes(i.unit) ? i.unit : 'pz', cat: catOf(i.cat), checked: true }));
-  if (!items.length) throw new Error('nessun prodotto trovato');
+  if (!items.length) throw new Error('nessun prodotto alimentare trovato nella foto');
   return items;
 }
 
