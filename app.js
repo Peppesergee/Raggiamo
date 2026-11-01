@@ -1,6 +1,6 @@
 'use strict';
 const $ = s => document.querySelector(s);
-const MODEL = 'claude-haiku-5-5';
+const MODEL = 'gemini-flash-latest';
 const UNITS = ['pz', 'kg', 'g', 'l', 'ml'];
 
 // ---------- Archivio (localStorage) ----------
@@ -122,24 +122,24 @@ Se una riga ha moltiplicatore (es. "3 x") usa quel numero di pezzi.
 Rispondi SOLO con un array JSON, senza testo aggiuntivo: [{"name": string, "qty": number, "unit": "pz"|"kg"|"g"|"l"|"ml"}]`;
 
 async function readReceipt(b64) {
-  const res = await fetch('https://api.anthropic.com/v1/messages', {
+  const res = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/${MODEL}:generateContent`, {
     method: 'POST',
-    headers: {
-      'content-type': 'application/json',
-      'x-api-key': load('apiKey', ''),
-      'anthropic-version': '2023-06-01',
-      'anthropic-dangerous-direct-browser-access': 'true',
-    },
+    headers: { 'content-type': 'application/json', 'x-goog-api-key': load('apiKey', '') },
     body: JSON.stringify({
-      model: MODEL, max_tokens: 4000,
-      messages: [{ role: 'user', content: [
-        { type: 'image', source: { type: 'base64', media_type: 'image/jpeg', data: b64 } },
-        { type: 'text', text: PROMPT },
+      contents: [{ parts: [
+        { inline_data: { mime_type: 'image/jpeg', data: b64 } },
+        { text: PROMPT },
       ] }],
+      generationConfig: { responseMimeType: 'application/json', temperature: 0 },
     }),
   });
-  if (!res.ok) throw new Error(res.status === 401 ? 'chiave API non valida' : `servizio non disponibile (${res.status})`);
-  const text = (await res.json()).content.map(b => b.text || '').join('');
+  if (!res.ok) {
+    throw new Error(res.status === 400 || res.status === 403 ? 'chiave API non valida'
+      : res.status === 429 ? 'limite gratuito raggiunto, riprova più tardi'
+      : `servizio non disponibile (${res.status})`);
+  }
+  const data = await res.json();
+  const text = (data.candidates?.[0]?.content?.parts || []).map(p => p.text || '').join('');
   const m = text.match(/\[[\s\S]*\]/);
   if (!m) throw new Error('risposta non comprensibile');
   const items = JSON.parse(m[0])
